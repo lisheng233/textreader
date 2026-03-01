@@ -12,6 +12,8 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -35,6 +37,8 @@ public class FilePickerActivity extends AppCompatActivity {
     private TextView tvCurrentPath;
     private TextView tvPermissionHint;
     private Button btnRequestPermission;
+    private LinearLayout permissionLayout;
+    private LinearLayout fileListLayout;
     private File currentDir;
     private ArrayList<File> fileList = new ArrayList<>();
     private ArrayAdapter<String> adapter;
@@ -52,10 +56,13 @@ public class FilePickerActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_file_picker);
         
+        // 初始化视图
         listView = findViewById(R.id.listView);
         tvCurrentPath = findViewById(R.id.tvCurrentPath);
         tvPermissionHint = findViewById(R.id.tvPermissionHint);
         btnRequestPermission = findViewById(R.id.btnRequestPermission);
+        permissionLayout = findViewById(R.id.permissionLayout);
+        fileListLayout = findViewById(R.id.fileListLayout);
         
         setTitle("选择文件");
         
@@ -171,9 +178,8 @@ public class FilePickerActivity extends AppCompatActivity {
     
     private void showFileList() {
         // 隐藏权限提示，显示文件列表
-        tvPermissionHint.setVisibility(View.GONE);
-        btnRequestPermission.setVisibility(View.GONE);
-        listView.setVisibility(View.VISIBLE);
+        permissionLayout.setVisibility(View.GONE);
+        fileListLayout.setVisibility(View.VISIBLE);
         tvCurrentPath.setVisibility(View.VISIBLE);
         
         loadFileList();
@@ -181,16 +187,15 @@ public class FilePickerActivity extends AppCompatActivity {
     
     private void showPermissionUI() {
         // 隐藏文件列表，显示权限提示
-        tvPermissionHint.setVisibility(View.VISIBLE);
-        btnRequestPermission.setVisibility(View.VISIBLE);
-        listView.setVisibility(View.GONE);
+        permissionLayout.setVisibility(View.VISIBLE);
+        fileListLayout.setVisibility(View.GONE);
         tvCurrentPath.setVisibility(View.GONE);
         
         // 根据Android版本显示不同的提示信息
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            tvPermissionHint.setText("需要所有文件访问权限才能读取文件。\n请点击下方按钮前往设置并开启\"允许管理所有文件\"。");
+            tvPermissionHint.setText("需要所有文件访问权限");
         } else {
-            tvPermissionHint.setText("需要存储权限才能读取文件。\n请点击下方按钮授予权限。");
+            tvPermissionHint.setText("需要存储权限");
         }
     }
     
