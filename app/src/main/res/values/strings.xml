@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">文本文件阅读器</string>
+    <string name="select_file">选择文件</string>
+    <string name="current_path">当前路径</string>
+    <string name="back">返回</string>
+    <string name="file_content">文件内容</string>
+</resources>
