@@ -13,7 +13,6 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -32,7 +31,13 @@ public class FilePickerActivity extends AppCompatActivity {
     private ArrayList<File> fileList = new ArrayList<>();
     private ArrayAdapter<String> adapter;
     
-    private final String[] supportedExtensions = {".txt", ".log", ".md", ".json", ".xml", ".html", ".csv"};
+    // 支持的文���类型 - 扩展更多格式
+    private final String[] supportedExtensions = {
+        ".txt", ".log", ".md", ".json", ".xml", ".html", ".htm", ".csv",
+        ".properties", ".conf", ".cfg", ".ini", ".bat", ".sh", ".js", ".css",
+        ".java", ".kt", ".py", ".cpp", ".c", ".h", ".php", ".asp", ".aspx",
+        ".jsp", ".rb", ".pl", ".sql", ".yaml", ".yml", ".toml"
+    };
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,6 +46,9 @@ public class FilePickerActivity extends AppCompatActivity {
         
         listView = findViewById(R.id.listView);
         tvCurrentPath = findViewById(R.id.tvCurrentPath);
+        
+        // 设置标题
+        setTitle("选择文件");
         
         checkPermissions();
     }
@@ -75,21 +83,48 @@ public class FilePickerActivity extends AppCompatActivity {
     }
     
     private void loadFileList() {
-        currentDir = Environment.getExternalStorageDirectory();
+        // 尝试多个可能的起始目录
+        File startDir = null;
+        
+        // 首先尝试外部存储
+        if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+            startDir = Environment.getExternalStorageDirectory();
+        }
+        
+        // 如果外部存储不可用，尝试内部存储
+        if (startDir == null || !startDir.exists()) {
+            startDir = Environment.getRootDirectory();
+        }
+        
+        // 如果还不行，使用应用的文件目录
+        if (startDir == null || !startDir.exists()) {
+            startDir = getFilesDir();
+        }
+        
+        currentDir = startDir;
         fillFileList(currentDir);
     }
     
     private void fillFileList(File dir) {
         fileList.clear();
+        
+        // 检查目录是否可读
+        if (dir == null || !dir.exists() || !dir.canRead()) {
+            tvCurrentPath.setText("无法访问: " + (dir != null ? dir.getAbsolutePath() : "未知路径"));
+            updateList();
+            Toast.makeText(this, "无法读取目录", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
         File[] files = dir.listFiles();
         
         tvCurrentPath.setText("当前路径: " + dir.getAbsolutePath());
         
-        if (files != null) {
-            // 修复：使用兼容API 21的排序方法
+        if (files != null && files.length > 0) {
+            // 转换为ArrayList以便排序
             ArrayList<File> fileArrayList = new ArrayList<>(Arrays.asList(files));
             
-            // 自定义排序，兼容API 21
+            // 按名称排序（忽略大小写）
             Collections.sort(fileArrayList, new Comparator<File>() {
                 @Override
                 public int compare(File f1, File f2) {
@@ -97,24 +132,32 @@ public class FilePickerActivity extends AppCompatActivity {
                 }
             });
             
-            // 添加上级目录
-            if (dir.getParentFile() != null) {
+            // 添加上级目录（如果不是根目录）
+            if (dir.getParentFile() != null && dir.getParentFile().canRead()) {
                 fileList.add(dir.getParentFile());
             }
             
-            // 添加文件夹
+            // 先添加所有文件夹
             for (File file : fileArrayList) {
-                if (file.isDirectory()) {
+                if (file.isDirectory() && file.canRead()) {
                     fileList.add(file);
                 }
             }
             
-            // 添加支持的文件
+            // 再添加所有支持的文件
             for (File file : fileArrayList) {
-                if (file.isFile() && isSupportedFile(file.getName())) {
-                    fileList.add(file);
+                if (file.isFile() && file.canRead()) {
+                    if (isSupportedFile(file.getName())) {
+                        fileList.add(file);
+                    }
                 }
             }
+            
+            // 调试信息
+            System.out.println("找到 " + fileArrayList.size() + " 个项目");
+            System.out.println("显示 " + fileList.size() + " 个项目（包含返回上级）");
+        } else {
+            Toast.makeText(this, "目录为空或无法读取", Toast.LENGTH_SHORT).show();
         }
         
         updateList();
@@ -132,15 +175,29 @@ public class FilePickerActivity extends AppCompatActivity {
     
     private void updateList() {
         ArrayList<String> names = new ArrayList<>();
+        
+        if (fileList.isEmpty()) {
+            names.add("📁 此文件夹为空");
+            adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, names);
+            listView.setAdapter(adapter);
+            listView.setOnItemClickListener(null); // 禁用点击
+            return;
+        }
+        
         for (File file : fileList) {
             if (file.isDirectory()) {
-                if (file.getParentFile() != null && file.equals(file.getParentFile())) {
-                    names.add(".. (返回上级)");
+                // 判断是否是上级目录
+                if (file.getParentFile() != null && 
+                    currentDir.getParentFile() != null && 
+                    file.getAbsolutePath().equals(currentDir.getParentFile().getAbsolutePath())) {
+                    names.add("🔙 .. (返回上级)");
                 } else {
                     names.add("📁 " + file.getName());
                 }
             } else {
-                names.add("📄 " + file.getName());
+                // 显示文件大小
+                String fileSize = getFileSize(file.length());
+                names.add("📄 " + file.getName() + " (" + fileSize + ")");
             }
         }
         
@@ -150,25 +207,56 @@ public class FilePickerActivity extends AppCompatActivity {
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                if (fileList.isEmpty()) return;
+                
                 File selectedFile = fileList.get(position);
+                
+                // 处理点击事件
                 if (selectedFile.isDirectory()) {
-                    currentDir = selectedFile;
-                    fillFileList(selectedFile);
+                    // 如果是目录，进入该目录
+                    if (selectedFile.canRead()) {
+                        currentDir = selectedFile;
+                        fillFileList(selectedFile);
+                    } else {
+                        Toast.makeText(FilePickerActivity.this, "无法读取该目录", Toast.LENGTH_SHORT).show();
+                    }
                 } else {
+                    // 如果是文件，打开它
                     openFile(selectedFile);
                 }
             }
         });
     }
     
+    private String getFileSize(long size) {
+        if (size <= 0) return "0 B";
+        
+        final String[] units = new String[]{"B", "KB", "MB", "GB", "TB"};
+        int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
+        return String.format("%.1f %s", size / Math.pow(1024, digitGroups), units[digitGroups]);
+    }
+    
     private void openFile(File file) {
-        if (file.length() > 20 * 1024 * 1024) { // 10MB限制
-            Toast.makeText(this, "文件太大，无法打开", Toast.LENGTH_SHORT).show();
+        if (file.length() > 50 * 1024 * 1024) { // 增大到50MB限制
+            Toast.makeText(this, "文件太大（超过50MB），无法打开", Toast.LENGTH_SHORT).show();
             return;
         }
         
         Intent intent = new Intent(this, FileViewerActivity.class);
         intent.putExtra("file_path", file.getAbsolutePath());
+        intent.putExtra("file_name", file.getName());
         startActivity(intent);
+    }
+    
+    @Override
+    public void onBackPressed() {
+        // 返回上级目录，而不是退出Activity
+        if (currentDir != null && currentDir.getParentFile() != null && 
+            currentDir.getParentFile().canRead()) {
+            currentDir = currentDir.getParentFile();
+            fillFileList(currentDir);
+        } else {
+            super.onBackPressed();
+        }
     }
 }
