@@ -3,11 +3,6 @@ package com.example.textfilereader;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Base64;
-import androidx.security.crypto.EncryptedSharedPreferences;
-import androidx.security.crypto.MasterKeys;
-import java.io.IOException;
-import java.security.GeneralSecurityException;
-import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -20,35 +15,22 @@ import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
 public class KeyManager {
-    private static final String PREFS_NAME = "secure_prefs";
+    private static final String PREFS_NAME = "key_prefs";
     private static final String KEY_ALIAS_PREFIX = "aes_key_";
     private static final String KEY_NAMES_SET = "key_names";
     private static KeyManager instance;
-    private Context context;
     private SharedPreferences sharedPreferences;
     private List<String> keyNames = new ArrayList<>();
 
     private KeyManager(Context context) {
-        this.context = context.getApplicationContext();
-        try {
-            String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
-            sharedPreferences = EncryptedSharedPreferences.create(
-                PREFS_NAME,
-                masterKeyAlias,
-                context,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            );
-            loadKeyNames();
-        } catch (GeneralSecurityException | IOException e) {
-            e.printStackTrace();
-            sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        }
+        // 使用普通SharedPreferences，不依赖安全库
+        sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        loadKeyNames();
     }
 
     public static synchronized KeyManager getInstance(Context context) {
         if (instance == null) {
-            instance = new KeyManager(context);
+            instance = new KeyManager(context.getApplicationContext());
         }
         return instance;
     }
@@ -63,20 +45,25 @@ public class KeyManager {
         sharedPreferences.edit().putStringSet(KEY_NAMES_SET, new HashSet<>(keyNames)).apply();
     }
 
-    public String generateRandomKey(String keyName) throws GeneralSecurityException {
-        KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
-        keyGenerator.init(256);
-        SecretKey secretKey = keyGenerator.generateKey();
-        
-        String keyBase64 = Base64.encodeToString(secretKey.getEncoded(), Base64.DEFAULT);
-        sharedPreferences.edit().putString(KEY_ALIAS_PREFIX + keyName, keyBase64).apply();
-        
-        if (!keyNames.contains(keyName)) {
-            keyNames.add(keyName);
-            saveKeyNames();
+    public String generateRandomKey(String keyName) {
+        try {
+            KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
+            keyGenerator.init(256);
+            SecretKey secretKey = keyGenerator.generateKey();
+            
+            String keyBase64 = Base64.encodeToString(secretKey.getEncoded(), Base64.DEFAULT);
+            sharedPreferences.edit().putString(KEY_ALIAS_PREFIX + keyName, keyBase64).apply();
+            
+            if (!keyNames.contains(keyName)) {
+                keyNames.add(keyName);
+                saveKeyNames();
+            }
+            
+            return keyName;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
-        
-        return keyName;
     }
 
     public SecretKey getKey(String keyName) {
@@ -119,16 +106,16 @@ public class KeyManager {
         return keyName;
     }
 
-    public void renameKey(String oldName, String newName) throws GeneralSecurityException {
+    public void renameKey(String oldName, String newName) throws Exception {
         if (oldName.equals(newName)) return;
         
         if (keyNames.contains(newName)) {
-            throw new GeneralSecurityException("密钥名称已存在");
+            throw new Exception("密钥名称已存在");
         }
         
         SecretKey key = getKey(oldName);
         if (key == null) {
-            throw new GeneralSecurityException("密钥不存在");
+            throw new Exception("密钥不存在");
         }
         
         // 保存到新名称
@@ -149,7 +136,7 @@ public class KeyManager {
         return salt;
     }
 
-    public SecretKey deriveKeyFromPassword(String password, byte[] salt) throws GeneralSecurityException {
+    public SecretKey deriveKeyFromPassword(String password, byte[] salt) throws Exception {
         SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 10000, 256);
         SecretKey tmp = factory.generateSecret(spec);
