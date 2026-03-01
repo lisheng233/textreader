@@ -3,16 +3,20 @@ package com.example.textfilereader;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.Settings;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -25,13 +29,17 @@ import java.util.Comparator;
 public class FilePickerActivity extends AppCompatActivity {
     
     private static final int PERMISSION_REQUEST_CODE = 100;
+    private static final int MANAGE_STORAGE_REQUEST_CODE = 101;
+    
     private ListView listView;
     private TextView tvCurrentPath;
+    private TextView tvPermissionHint;
+    private Button btnRequestPermission;
     private File currentDir;
     private ArrayList<File> fileList = new ArrayList<>();
     private ArrayAdapter<String> adapter;
     
-    // 支持的文���类型 - 扩展更多格式
+    // 支持的文件类型
     private final String[] supportedExtensions = {
         ".txt", ".log", ".md", ".json", ".xml", ".html", ".htm", ".csv",
         ".properties", ".conf", ".cfg", ".ini", ".bat", ".sh", ".js", ".css",
@@ -46,25 +54,63 @@ public class FilePickerActivity extends AppCompatActivity {
         
         listView = findViewById(R.id.listView);
         tvCurrentPath = findViewById(R.id.tvCurrentPath);
+        tvPermissionHint = findViewById(R.id.tvPermissionHint);
+        btnRequestPermission = findViewById(R.id.btnRequestPermission);
         
-        // 设置标题
         setTitle("选择文件");
         
-        checkPermissions();
+        // 设置权限按钮点击事件
+        btnRequestPermission.setOnClickListener(v -> requestStoragePermission());
+        
+        // 检查并处理权限
+        checkAndHandlePermission();
     }
     
-    private void checkPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) 
-                    != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
-                        PERMISSION_REQUEST_CODE);
-            } else {
-                loadFileList();
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // 当从权限设置页面返回时，重新检查权限
+        checkAndHandlePermission();
+    }
+    
+    private void checkAndHandlePermission() {
+        if (hasStoragePermission()) {
+            // 已有权限，显示文件列表
+            showFileList();
+        } else {
+            // 没有权限，显示权限提示
+            showPermissionUI();
+        }
+    }
+    
+    private boolean hasStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ 需要 MANAGE_EXTERNAL_STORAGE 权限
+            return Environment.isExternalStorageManager();
+        } else {
+            // Android 10及以下需要 READ_EXTERNAL_STORAGE 权限
+            int result = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE);
+            return result == PackageManager.PERMISSION_GRANTED;
+        }
+    }
+    
+    private void requestStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ 需要引导用户到设置页面开启所有文件访问权限
+            try {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent, MANAGE_STORAGE_REQUEST_CODE);
+            } catch (Exception e) {
+                // 如果上面的intent失败，尝试使用通用设置
+                Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                startActivityForResult(intent, MANAGE_STORAGE_REQUEST_CODE);
             }
         } else {
-            loadFileList();
+            // Android 10及以下请求 READ_EXTERNAL_STORAGE 权限
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
+                    PERMISSION_REQUEST_CODE);
         }
     }
     
@@ -72,13 +118,79 @@ public class FilePickerActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, 
                                           @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                loadFileList();
+                // 权限被授予
+                showFileList();
+                Toast.makeText(this, "权限获取成功", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "需要存储权限才能读取文件", Toast.LENGTH_LONG).show();
-                finish();
+                // 权限被拒绝
+                showPermissionUI();
+                
+                // 检查是否需要显示解释对话框
+                if (ActivityCompat.shouldShowRequestPermissionRationale(this, 
+                        Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                    showPermissionExplanationDialog();
+                } else {
+                    Toast.makeText(this, "需要存储权限才能读取文件", Toast.LENGTH_LONG).show();
+                }
             }
+        }
+    }
+    
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        
+        if (requestCode == MANAGE_STORAGE_REQUEST_CODE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (Environment.isExternalStorageManager()) {
+                    // 用户授予了所有文件访问权限
+                    showFileList();
+                    Toast.makeText(this, "权限获取成功", Toast.LENGTH_SHORT).show();
+                } else {
+                    // 用户没有授予权限
+                    showPermissionUI();
+                    Toast.makeText(this, "需要所有文件访问权限才能读取文件", Toast.LENGTH_LONG).show();
+                }
+            }
+        }
+    }
+    
+    private void showPermissionExplanationDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("需要存储权限")
+                .setMessage("我们需要存储权限来读取您手机上的文本文件。请在下一次授权时选择\"允许\"。")
+                .setPositiveButton("确定", (dialog, which) -> {
+                    requestStoragePermission();
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+    
+    private void showFileList() {
+        // 隐藏权限提示，显示文件列表
+        tvPermissionHint.setVisibility(View.GONE);
+        btnRequestPermission.setVisibility(View.GONE);
+        listView.setVisibility(View.VISIBLE);
+        tvCurrentPath.setVisibility(View.VISIBLE);
+        
+        loadFileList();
+    }
+    
+    private void showPermissionUI() {
+        // 隐藏文件列表，显示权限提示
+        tvPermissionHint.setVisibility(View.VISIBLE);
+        btnRequestPermission.setVisibility(View.VISIBLE);
+        listView.setVisibility(View.GONE);
+        tvCurrentPath.setVisibility(View.GONE);
+        
+        // 根据Android版本显示不同的提示信息
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            tvPermissionHint.setText("需要所有文件访问权限才能读取文件。\n请点击下方按钮前往设置并开启\"允许管理所有文件\"。");
+        } else {
+            tvPermissionHint.setText("需要存储权限才能读取文件。\n请点击下方按钮授予权限。");
         }
     }
     
@@ -96,7 +208,12 @@ public class FilePickerActivity extends AppCompatActivity {
             startDir = Environment.getRootDirectory();
         }
         
-        // 如果还不行，使用应用的文件目录
+        // 如果还不行，使用下载目录
+        if (startDir == null || !startDir.exists()) {
+            startDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        }
+        
+        // 最后尝试应用的文件目录
         if (startDir == null || !startDir.exists()) {
             startDir = getFilesDir();
         }
@@ -152,10 +269,6 @@ public class FilePickerActivity extends AppCompatActivity {
                     }
                 }
             }
-            
-            // 调试信息
-            System.out.println("找到 " + fileArrayList.size() + " 个项目");
-            System.out.println("显示 " + fileList.size() + " 个项目（包含返回上级）");
         } else {
             Toast.makeText(this, "目录为空或无法读取", Toast.LENGTH_SHORT).show();
         }
@@ -180,7 +293,7 @@ public class FilePickerActivity extends AppCompatActivity {
             names.add("📁 此文件夹为空");
             adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, names);
             listView.setAdapter(adapter);
-            listView.setOnItemClickListener(null); // 禁用点击
+            listView.setOnItemClickListener(null);
             return;
         }
         
@@ -211,9 +324,7 @@ public class FilePickerActivity extends AppCompatActivity {
                 
                 File selectedFile = fileList.get(position);
                 
-                // 处理点击事件
                 if (selectedFile.isDirectory()) {
-                    // 如果是目录，进入该目录
                     if (selectedFile.canRead()) {
                         currentDir = selectedFile;
                         fillFileList(selectedFile);
@@ -221,7 +332,6 @@ public class FilePickerActivity extends AppCompatActivity {
                         Toast.makeText(FilePickerActivity.this, "无法读取该目录", Toast.LENGTH_SHORT).show();
                     }
                 } else {
-                    // 如果是文件，打开它
                     openFile(selectedFile);
                 }
             }
@@ -237,7 +347,7 @@ public class FilePickerActivity extends AppCompatActivity {
     }
     
     private void openFile(File file) {
-        if (file.length() > 50 * 1024 * 1024) { // 增大到50MB限制
+        if (file.length() > 50 * 1024 * 1024) {
             Toast.makeText(this, "文件太大（超过50MB），无法打开", Toast.LENGTH_SHORT).show();
             return;
         }
