@@ -21,9 +21,14 @@
             </intent-filter>
         </activity>
         
-        <activity android:name=".FilePickerActivity" />
-        <activity android:name=".FileViewerActivity" />
-        
+        <activity
+            android:name=".FilePickerActivity"
+            android:label="选择文件" />
+            
+        <activity
+            android:name=".FileViewerActivity"
+            android:label="文件内容" />
+            
     </application>
 
 </manifest>
