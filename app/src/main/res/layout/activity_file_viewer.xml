@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- 分页控件 -->
+    <LinearLayout
+        android:id="@+id/paginationLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:padding="8dp"
+        android:background="#f0f0f0"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btnPrevPage"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="上一页"
+            android:textSize="14sp"
+            android:enabled="false"/>
+
+        <TextView
+            android:id="@+id/tvPageInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="第 0 页 / 共 0 页"
+            android:textSize="14sp"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"/>
+
+        <Button
+            android:id="@+id/btnNextPage"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="下一页"
+            android:textSize="14sp"
+            android:enabled="false"/>
+
+    </LinearLayout>
+
+    <!-- 内容区域 -->
+    <ScrollView
+        android:id="@+id/scrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="15dp"
+        android:background="#ffffff">
+
+        <TextView
+            android:id="@+id/tvContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:fontFamily="monospace"
+            android:lineSpacingExtra="2dp"/>
+
+    </ScrollView>
+
+</LinearLayout>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="密钥名称:"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+
+        <EditText
+            android:id="@+id/etKeyName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="例如: imported_key"
+            android:inputType="text"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="密钥Base64:"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+
+        <EditText
+            android:id="@+id/etKeyBase64"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="粘贴密钥Base64字符串"
+            android:inputType="textMultiLine"
+            android:minLines="3"
+            android:maxLines="5"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="密钥格式: AES-256 Base64编码"
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:layout_marginTop="8dp"/>
+
+    </LinearLayout>
+</ScrollView>
