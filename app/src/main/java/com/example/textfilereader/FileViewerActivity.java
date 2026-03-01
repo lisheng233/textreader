@@ -27,6 +27,12 @@ public class FileViewerActivity extends AppCompatActivity {
         scrollView = findViewById(R.id.scrollView);
         
         String filePath = getIntent().getStringExtra("file_path");
+        String fileName = getIntent().getStringExtra("file_name");
+        
+        if (fileName != null) {
+            setTitle(fileName);
+        }
+        
         if (filePath != null) {
             loadFileContent(filePath);
         } else {
@@ -37,21 +43,32 @@ public class FileViewerActivity extends AppCompatActivity {
     
     private void loadFileContent(String filePath) {
         File file = new File(filePath);
-        setTitle(file.getName());
+        
+        Toast.makeText(this, "正在加载文件...", Toast.LENGTH_SHORT).show();
         
         new Thread(() -> {
             StringBuilder content = new StringBuilder();
+            int lineCount = 0;
+            int maxLines = 5000; // 限制显示行数，防止内存溢出
+            
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
                 
                 String line;
-                while ((line = reader.readLine()) != null) {
+                while ((line = reader.readLine()) != null && lineCount < maxLines) {
                     content.append(line).append("\n");
+                    lineCount++;
                 }
                 
+                if (lineCount >= maxLines) {
+                    content.append("\n\n... (文件过大，只显示前5000行)");
+                }
+                
+                String finalContent = content.toString();
                 mainHandler.post(() -> {
-                    tvContent.setText(content.toString());
+                    tvContent.setText(finalContent);
                     scrollView.scrollTo(0, 0);
+                    Toast.makeText(this, "加载完成，共 " + lineCount + " 行", Toast.LENGTH_SHORT).show();
                 });
                 
             } catch (Exception e) {
