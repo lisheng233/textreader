@@ -6,17 +6,12 @@ import android.os.Looper;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,7 +19,6 @@ public class FileViewerActivity extends AppCompatActivity {
     
     private TextView tvContent;
     private ScrollView scrollView;
-    private ProgressBar progressBar;
     private LinearLayout paginationLayout;
     private Button btnPrevPage;
     private Button btnNextPage;
@@ -33,13 +27,11 @@ public class FileViewerActivity extends AppCompatActivity {
     private Handler mainHandler = new Handler(Looper.getMainLooper());
     
     // 分页相关变量
-    private List<Long> pagePositions = new ArrayList<>(); // 每页在文件中的起始位置
+    private List<Long> pagePositions = new ArrayList<>();
     private int currentPage = 0;
     private int totalPages = 0;
-    private long fileSize = 0;
     private String filePath;
     private static final int PAGE_SIZE = 100; // 每页显示行数
-    private static final long MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB限制
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,7 +40,6 @@ public class FileViewerActivity extends AppCompatActivity {
         
         tvContent = findViewById(R.id.tvContent);
         scrollView = findViewById(R.id.scrollView);
-        progressBar = findViewById(R.id.progressBar);
         paginationLayout = findViewById(R.id.paginationLayout);
         btnPrevPage = findViewById(R.id.btnPrevPage);
         btnNextPage = findViewById(R.id.btnNextPage);
@@ -62,16 +53,7 @@ public class FileViewerActivity extends AppCompatActivity {
         }
         
         if (filePath != null) {
-            File file = new File(filePath);
-            fileSize = file.length();
-            
-            if (fileSize > MAX_FILE_SIZE) {
-                Toast.makeText(this, "文件过大（超过500MB），无法打开", Toast.LENGTH_LONG).show();
-                finish();
-                return;
-            }
-            
-            // 分析文件并建立索引
+            // 直接分析文件并建立索引
             analyzeFile();
         } else {
             Toast.makeText(this, "文件路径错误", Toast.LENGTH_SHORT).show();
@@ -84,8 +66,6 @@ public class FileViewerActivity extends AppCompatActivity {
     }
     
     private void analyzeFile() {
-        showLoading(true);
-        
         new Thread(() -> {
             try {
                 pagePositions.clear();
@@ -93,19 +73,17 @@ public class FileViewerActivity extends AppCompatActivity {
                 
                 RandomAccessFile raf = new RandomAccessFile(filePath, "r");
                 long fileLength = raf.length();
-                long position = 0;
                 int lineCount = 0;
                 
-                while (position < fileLength) {
+                while (raf.getFilePointer() < fileLength) {
                     String line = raf.readLine();
                     if (line == null) break;
                     
                     lineCount++;
-                    position = raf.getFilePointer();
                     
                     // 每PAGE_SIZE行记录一个分页位置
                     if (lineCount % PAGE_SIZE == 0) {
-                        pagePositions.add(position);
+                        pagePositions.add(raf.getFilePointer());
                     }
                 }
                 
@@ -114,7 +92,6 @@ public class FileViewerActivity extends AppCompatActivity {
                 totalPages = pagePositions.size();
                 
                 mainHandler.post(() -> {
-                    showLoading(false);
                     if (totalPages > 0) {
                         paginationLayout.setVisibility(View.VISIBLE);
                         loadPage(0);
@@ -125,11 +102,10 @@ public class FileViewerActivity extends AppCompatActivity {
                 
             } catch (Exception e) {
                 e.printStackTrace();
-                mainHandler.post(() -> {
-                    showLoading(false);
-                    Toast.makeText(this, "分析文件失败: " + e.getMessage(), 
-                                  Toast.LENGTH_LONG).show();
-                });
+                mainHandler.post(() -> 
+                    Toast.makeText(FileViewerActivity.this, 
+                                  "分析文件失败: " + e.getMessage(), 
+                                  Toast.LENGTH_LONG).show());
             }
         }).start();
     }
@@ -139,8 +115,6 @@ public class FileViewerActivity extends AppCompatActivity {
         
         currentPage = pageIndex;
         updatePageInfo();
-        
-        showLoading(true);
         
         new Thread(() -> {
             try {
@@ -174,26 +148,18 @@ public class FileViewerActivity extends AppCompatActivity {
                 raf.close();
                 
                 String finalContent = content.toString();
-                int finalLinesLoaded = linesLoaded;
                 
                 mainHandler.post(() -> {
                     tvContent.setText(finalContent);
                     scrollView.scrollTo(0, 0);
-                    showLoading(false);
-                    
-                    Toast.makeText(this, 
-                                  "第 " + (pageIndex + 1) + " 页，共 " + 
-                                  finalLinesLoaded + " 行", 
-                                  Toast.LENGTH_SHORT).show();
                 });
                 
             } catch (Exception e) {
                 e.printStackTrace();
-                mainHandler.post(() -> {
-                    showLoading(false);
-                    Toast.makeText(this, "加载页面失败: " + e.getMessage(), 
-                                  Toast.LENGTH_LONG).show();
-                });
+                mainHandler.post(() -> 
+                    Toast.makeText(FileViewerActivity.this, 
+                                  "加载页面失败: " + e.getMessage(), 
+                                  Toast.LENGTH_LONG).show());
             }
         }).start();
     }
@@ -208,10 +174,5 @@ public class FileViewerActivity extends AppCompatActivity {
         tvPageInfo.setText("第 " + (currentPage + 1) + " 页 / 共 " + totalPages + " 页");
         btnPrevPage.setEnabled(currentPage > 0);
         btnNextPage.setEnabled(currentPage < totalPages - 1);
-    }
-    
-    private void showLoading(boolean show) {
-        progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
-        tvContent.setVisibility(show ? View.GONE : View.VISIBLE);
     }
 }
