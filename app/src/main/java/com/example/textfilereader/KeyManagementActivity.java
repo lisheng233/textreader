@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -18,12 +19,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.PrintWriter;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import javax.crypto.SecretKey;
@@ -45,18 +43,20 @@ public class KeyManagementActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_key_management);
         
-        // 设置工具栏
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setTitle("密钥管理");
-        
         // 初始化视图
         listView = findViewById(R.id.listView);
         tvEmpty = findViewById(R.id.tvEmpty);
         btnGenerateKey = findViewById(R.id.btnGenerateKey);
         btnImportKey = findViewById(R.id.btnImportKey);
         btnExportAll = findViewById(R.id.btnExportAll);
+        
+        // 设置 Toolbar
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle("密钥管理");
+        }
         
         keyManager = KeyManager.getInstance(this);
         
@@ -73,6 +73,15 @@ public class KeyManagementActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadKeyList();
+    }
+    
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
     
     private void loadKeyList() {
@@ -153,16 +162,7 @@ public class KeyManagementActivity extends AppCompatActivity {
                    }
                    
                    try {
-                       // 获取原密钥
-                       SecretKey key = keyManager.getKey(oldName);
-                       if (key == null) {
-                           Toast.makeText(this, "密钥不存在", Toast.LENGTH_SHORT).show();
-                           return;
-                       }
-                       
-                       // 保存为新名称
-                       keyManager.generateRandomKey(newName); // 这会生成新密钥，我们需要改进
-                       // 这里需要改进KeyManager来支持重命名
+                       keyManager.renameKey(oldName, newName);
                        Toast.makeText(this, "重命名成功", Toast.LENGTH_SHORT).show();
                        loadKeyList();
                    } catch (Exception e) {
@@ -198,7 +198,7 @@ public class KeyManagementActivity extends AppCompatActivity {
         String keyBase64 = android.util.Base64.encodeToString(key.getEncoded(), android.util.Base64.DEFAULT);
         
         // 创建导出文件
-        File exportDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "TextReaderKeys");
+        File exportDir = new File(getExternalFilesDir(null), "keys");
         if (!exportDir.exists()) {
             exportDir.mkdirs();
         }
@@ -210,7 +210,7 @@ public class KeyManagementActivity extends AppCompatActivity {
             out.println("# 密钥名称: " + keyName);
             out.println("# 导出时间: " + new java.util.Date().toString());
             out.println("# 密钥格式: AES-256 Base64");
-            out.println(keyBase64);
+            out.println(keyBase64.trim());
             
             Toast.makeText(this, "密钥已导出到: " + exportFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
             
@@ -218,12 +218,7 @@ public class KeyManagementActivity extends AppCompatActivity {
             new AlertDialog.Builder(this)
                 .setTitle("导出成功")
                 .setMessage("密钥已保存到:\n" + exportFile.getAbsolutePath())
-                .setPositiveButton("打开文件夹", (dialog, which) -> {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setDataAndType(Uri.fromFile(exportDir), "resource/folder");
-                    startActivity(Intent.createChooser(intent, "打开文件夹"));
-                })
-                .setNegativeButton("确定", null)
+                .setPositiveButton("确定", null)
                 .show();
                 
         } catch (Exception e) {
@@ -239,7 +234,7 @@ public class KeyManagementActivity extends AppCompatActivity {
             return;
         }
         
-        File exportDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "TextReaderKeys");
+        File exportDir = new File(getExternalFilesDir(null), "keys");
         if (!exportDir.exists()) {
             exportDir.mkdirs();
         }
@@ -288,10 +283,7 @@ public class KeyManagementActivity extends AppCompatActivity {
     }
     
     private void importKeyFromFile() {
-        // 这里应该打开文件选择器，简化起见，我们提示用户文件位置
-        Toast.makeText(this, "请将.key文件放到 Download/TextReaderKeys/ 目录下", Toast.LENGTH_LONG).show();
-        
-        File importDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "TextReaderKeys");
+        File importDir = new File(getExternalFilesDir(null), "keys");
         if (!importDir.exists()) {
             importDir.mkdirs();
         }
@@ -322,7 +314,6 @@ public class KeyManagementActivity extends AppCompatActivity {
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             StringBuilder content = new StringBuilder();
             String line;
-            boolean inKey = false;
             
             while ((line = reader.readLine()) != null) {
                 if (line.startsWith("#") || line.trim().isEmpty()) {
@@ -391,11 +382,5 @@ public class KeyManagementActivity extends AppCompatActivity {
                })
                .setNegativeButton("取消", null)
                .show();
-    }
-    
-    @Override
-    public boolean onSupportNavigateUp() {
-        onBackPressed();
-        return true;
     }
 }
