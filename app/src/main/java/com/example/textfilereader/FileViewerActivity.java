@@ -50,6 +50,7 @@ public class FileViewerActivity extends AppCompatActivity {
             StringBuilder content = new StringBuilder();
             int lineCount = 0;
             int maxLines = 5000; // 限制显示行数，防止内存溢出
+            final int[] finalLineCount = {0}; // 使用数组来存储可变的lineCount
             
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
@@ -60,6 +61,8 @@ public class FileViewerActivity extends AppCompatActivity {
                     lineCount++;
                 }
                 
+                finalLineCount[0] = lineCount; // 保存lineCount的值
+                
                 if (lineCount >= maxLines) {
                     content.append("\n\n... (文件过大，只显示前5000行)");
                 }
@@ -68,13 +71,17 @@ public class FileViewerActivity extends AppCompatActivity {
                 mainHandler.post(() -> {
                     tvContent.setText(finalContent);
                     scrollView.scrollTo(0, 0);
-                    Toast.makeText(this, "加载完成，共 " + lineCount + " 行", Toast.LENGTH_SHORT).show();
+                    // 使用finalLineCount[0]而不是lineCount
+                    Toast.makeText(FileViewerActivity.this, 
+                                  "加载完成，共 " + finalLineCount[0] + " 行", 
+                                  Toast.LENGTH_SHORT).show();
                 });
                 
             } catch (Exception e) {
                 e.printStackTrace();
                 mainHandler.post(() -> 
-                    Toast.makeText(this, "读取文件失败: " + e.getMessage(), 
+                    Toast.makeText(FileViewerActivity.this, 
+                                  "读取文件失败: " + e.getMessage(), 
                                   Toast.LENGTH_LONG).show());
             }
         }).start();
