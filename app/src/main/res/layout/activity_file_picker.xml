@@ -4,20 +4,82 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- 当前路径显示 -->
     <TextView
         android:id="@+id/tvCurrentPath"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="10dp"
+        android:padding="12dp"
         android:text="当前路径: "
         android:textSize="14sp"
-        android:background="#f0f0f0"/>
+        android:textColor="#666666"
+        android:background="#f5f5f5"
+        android:visibility="gone"/>
 
-    <ListView
-        android:id="@+id/listView"
+    <!-- 权限提示布局 -->
+    <LinearLayout
+        android:id="@+id/permissionLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:dividerHeight="1dp"
-        android:divider="#cccccc"/>
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="24dp"
+        android:visibility="visible">
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@android:drawable/ic_dialog_info"
+            android:layout_marginBottom="16dp"
+            android:tint="#2196F3"/>
+
+        <TextView
+            android:id="@+id/tvPermissionHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="需要存储权限才能读取文件"
+            android:textSize="18sp"
+            android:textColor="#333333"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="12dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="请授予存储权限以浏览和打开文本文件"
+            android:textSize="14sp"
+            android:textColor="#666666"
+            android:gravity="center"
+            android:layout_marginBottom="24dp"/>
+
+        <Button
+            android:id="@+id/btnRequestPermission"
+            android:layout_width="200dp"
+            android:layout_height="48dp"
+            android:text="授予权限"
+            android:textSize="16sp"
+            android:backgroundTint="#2196F3"
+            android:textColor="#FFFFFF"/>
+
+    </LinearLayout>
+
+    <!-- 文件列表布局 -->
+    <LinearLayout
+        android:id="@+id/fileListLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ListView
+            android:id="@+id/listView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="@android:color/darker_gray"
+            android:dividerHeight="1px"
+            android:padding="8dp"/>
+
+    </LinearLayout>
 
 </LinearLayout>
