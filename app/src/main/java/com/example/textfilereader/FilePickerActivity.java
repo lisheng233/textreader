@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 
 public class FilePickerActivity extends AppCompatActivity {
@@ -85,8 +86,16 @@ public class FilePickerActivity extends AppCompatActivity {
         tvCurrentPath.setText("当前路径: " + dir.getAbsolutePath());
         
         if (files != null) {
-            // 按名称排序
-            Arrays.sort(files, Comparator.comparing(File::getName));
+            // 修复：使用兼容API 21的排序方法
+            ArrayList<File> fileArrayList = new ArrayList<>(Arrays.asList(files));
+            
+            // 自定义排序，兼容API 21
+            Collections.sort(fileArrayList, new Comparator<File>() {
+                @Override
+                public int compare(File f1, File f2) {
+                    return f1.getName().compareToIgnoreCase(f2.getName());
+                }
+            });
             
             // 添加上级目录
             if (dir.getParentFile() != null) {
@@ -94,14 +103,14 @@ public class FilePickerActivity extends AppCompatActivity {
             }
             
             // 添加文件夹
-            for (File file : files) {
+            for (File file : fileArrayList) {
                 if (file.isDirectory()) {
                     fileList.add(file);
                 }
             }
             
             // 添加支持的文件
-            for (File file : files) {
+            for (File file : fileArrayList) {
                 if (file.isFile() && isSupportedFile(file.getName())) {
                     fileList.add(file);
                 }
@@ -138,19 +147,22 @@ public class FilePickerActivity extends AppCompatActivity {
         adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, names);
         listView.setAdapter(adapter);
         
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            File selectedFile = fileList.get(position);
-            if (selectedFile.isDirectory()) {
-                currentDir = selectedFile;
-                fillFileList(selectedFile);
-            } else {
-                openFile(selectedFile);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                File selectedFile = fileList.get(position);
+                if (selectedFile.isDirectory()) {
+                    currentDir = selectedFile;
+                    fillFileList(selectedFile);
+                } else {
+                    openFile(selectedFile);
+                }
             }
         });
     }
     
     private void openFile(File file) {
-        if (file.length() > 20 * 1024 * 1024) { // 20MB限制
+        if (file.length() > 20 * 1024 * 1024) { // 10MB限制
             Toast.makeText(this, "文件太大，无法打开", Toast.LENGTH_SHORT).show();
             return;
         }
