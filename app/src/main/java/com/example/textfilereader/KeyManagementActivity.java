@@ -1,27 +1,20 @@
 package com.example.textfilereader;
 
 import android.app.AlertDialog;
-import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
-import android.view.MenuItem;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.List;
 import javax.crypto.SecretKey;
@@ -33,7 +26,6 @@ public class KeyManagementActivity extends AppCompatActivity {
     private TextView tvEmpty;
     private Button btnGenerateKey;
     private Button btnImportKey;
-    private Button btnExportAll;
     private KeyManager keyManager;
     private List<String> keyNames;
     private ArrayAdapter<String> adapter;
@@ -48,22 +40,15 @@ public class KeyManagementActivity extends AppCompatActivity {
         tvEmpty = findViewById(R.id.tvEmpty);
         btnGenerateKey = findViewById(R.id.btnGenerateKey);
         btnImportKey = findViewById(R.id.btnImportKey);
-        btnExportAll = findViewById(R.id.btnExportAll);
         
-        // 设置 Toolbar
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("密钥管理");
-        }
+        // 设置标题
+        setTitle("密钥管理");
         
         keyManager = KeyManager.getInstance(this);
         
         // 设置按钮点击事件
         btnGenerateKey.setOnClickListener(v -> showGenerateKeyDialog());
         btnImportKey.setOnClickListener(v -> showImportKeyDialog());
-        btnExportAll.setOnClickListener(v -> exportAllKeys());
         
         // 加载密钥列表
         loadKeyList();
@@ -73,15 +58,6 @@ public class KeyManagementActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadKeyList();
-    }
-    
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            onBackPressed();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
     }
     
     private void loadKeyList() {
@@ -119,13 +95,12 @@ public class KeyManagementActivity extends AppCompatActivity {
                        return;
                    }
                    
-                   try {
-                       keyManager.generateRandomKey(keyName);
+                   String result = keyManager.generateRandomKey(keyName);
+                   if (result != null) {
                        Toast.makeText(this, "密钥生成成功: " + keyName, Toast.LENGTH_SHORT).show();
                        loadKeyList();
-                   } catch (Exception e) {
-                       e.printStackTrace();
-                       Toast.makeText(this, "密钥生成失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                   } else {
+                       Toast.makeText(this, "密钥生成失败", Toast.LENGTH_LONG).show();
                    }
                })
                .setNegativeButton("取消", null)
@@ -137,41 +112,8 @@ public class KeyManagementActivity extends AppCompatActivity {
             .setTitle("密钥操作")
             .setMessage("密钥名称: " + keyName)
             .setPositiveButton("导出", (dialog, which) -> exportKey(keyName))
-            .setNeutralButton("重命名", (dialog, which) -> showRenameKeyDialog(keyName))
             .setNegativeButton("删除", (dialog, which) -> showDeleteKeyDialog(keyName))
             .show();
-    }
-    
-    private void showRenameKeyDialog(String oldName) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        View view = getLayoutInflater().inflate(R.layout.dialog_rename_key, null);
-        EditText etNewName = view.findViewById(R.id.etNewName);
-        etNewName.setText(oldName);
-        
-        builder.setView(view)
-               .setTitle("重命名密钥")
-               .setPositiveButton("确定", (dialog, which) -> {
-                   String newName = etNewName.getText().toString().trim();
-                   if (newName.isEmpty()) {
-                       Toast.makeText(this, "请输入新名称", Toast.LENGTH_SHORT).show();
-                       return;
-                   }
-                   
-                   if (newName.equals(oldName)) {
-                       return;
-                   }
-                   
-                   try {
-                       keyManager.renameKey(oldName, newName);
-                       Toast.makeText(this, "重命名成功", Toast.LENGTH_SHORT).show();
-                       loadKeyList();
-                   } catch (Exception e) {
-                       e.printStackTrace();
-                       Toast.makeText(this, "重命名失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                   }
-               })
-               .setNegativeButton("取消", null)
-               .show();
     }
     
     private void showDeleteKeyDialog(String keyName) {
@@ -197,7 +139,7 @@ public class KeyManagementActivity extends AppCompatActivity {
         // 将密钥转换为Base64
         String keyBase64 = android.util.Base64.encodeToString(key.getEncoded(), android.util.Base64.DEFAULT);
         
-        // 创建导出文件
+        // 创建导出文件到下载目录
         File exportDir = new File(getExternalFilesDir(null), "keys");
         if (!exportDir.exists()) {
             exportDir.mkdirs();
@@ -205,12 +147,14 @@ public class KeyManagementActivity extends AppCompatActivity {
         
         File exportFile = new File(exportDir, keyName + ".key");
         
-        try (PrintWriter out = new PrintWriter(new FileWriter(exportFile))) {
-            out.println("# TextReader 导出密钥");
-            out.println("# 密钥名称: " + keyName);
-            out.println("# 导出时间: " + new java.util.Date().toString());
-            out.println("# 密钥格式: AES-256 Base64");
-            out.println(keyBase64.trim());
+        try (FileOutputStream fos = new FileOutputStream(exportFile);
+             OutputStreamWriter osw = new OutputStreamWriter(fos)) {
+            
+            osw.write("# TextReader 导出密钥\n");
+            osw.write("# 密钥名称: " + keyName + "\n");
+            osw.write("# 导出时间: " + new java.util.Date().toString() + "\n");
+            osw.write("# 密钥格式: AES-256 Base64\n");
+            osw.write(keyBase64.trim() + "\n");
             
             Toast.makeText(this, "密钥已导出到: " + exportFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
             
@@ -221,45 +165,6 @@ public class KeyManagementActivity extends AppCompatActivity {
                 .setPositiveButton("确定", null)
                 .show();
                 
-        } catch (Exception e) {
-            e.printStackTrace();
-            Toast.makeText(this, "导出失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-    
-    private void exportAllKeys() {
-        List<String> keys = keyManager.getKeyNames();
-        if (keys.isEmpty()) {
-            Toast.makeText(this, "没有可导出的密钥", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        File exportDir = new File(getExternalFilesDir(null), "keys");
-        if (!exportDir.exists()) {
-            exportDir.mkdirs();
-        }
-        
-        File exportFile = new File(exportDir, "all_keys_" + System.currentTimeMillis() + ".txt");
-        int successCount = 0;
-        
-        try (PrintWriter out = new PrintWriter(new FileWriter(exportFile))) {
-            out.println("# TextReader 批量导出密钥");
-            out.println("# 导出时间: " + new java.util.Date().toString());
-            out.println("# 密钥总数: " + keys.size());
-            out.println("# ====================================");
-            
-            for (String keyName : keys) {
-                SecretKey key = keyManager.getKey(keyName);
-                if (key != null) {
-                    String keyBase64 = android.util.Base64.encodeToString(key.getEncoded(), android.util.Base64.DEFAULT);
-                    out.println("\n[密钥: " + keyName + "]");
-                    out.println(keyBase64.trim());
-                    successCount++;
-                }
-            }
-            
-            Toast.makeText(this, "成功导出 " + successCount + " 个密钥到:\n" + exportFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
-            
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "导出失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
