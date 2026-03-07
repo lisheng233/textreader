@@ -44,10 +44,10 @@ public class FilePickerActivity extends AppCompatActivity {
     
     // 支持的文件类型
     private final String[] supportedExtensions = {
-        ".txt", ".log", ".md", ".json", ".xml", ".html", ".htm", ".csv",
-        ".properties", ".conf", ".cfg", ".ini", ".bat", ".sh", ".js", ".css",
-        ".java", ".kt", ".py", ".cpp", ".c", ".h", ".php", ".asp", ".aspx",
-        ".jsp", ".rb", ".pl", ".sql", ".yaml", ".yml", ".toml", ".enc"
+        ".txt", ".log", ".md", ".json", ".xml", ".html", ".htm", ".csv", ".xhtml",".webui",".zsh",".diff","guess",".zshrc",".SF",".prop",".cs",".xaml",
+        ".properties", ".conf", ".cfg", ".ini", ".bat", ".sh", ".js", ".css",".settings",".opf",".ac",".m4",".ztst",".icp",".MF",".pyi",".swift",".ipynb",
+        ".java", ".kt", ".py", ".cpp", ".c", ".h", ".php", ".asp", ".aspx",".ps1",".vue",".lua",".in",".mdd",".awk",".cil",".config",".go",".env",".gd",
+        ".jsp", ".rb", ".pl", ".sql", ".yaml", ".yml", ".toml", ".enc",".rs",".list",".gradle",".hpp",".rc",".adoc",".mra",".mrm",".pyw",".cmd",".bash"
     };
     
     @Override
